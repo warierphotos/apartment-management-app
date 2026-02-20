@@ -34,6 +34,24 @@
                     body: JSON.stringify({ username, password })
                 });
                 const data = await res.json();
+
+                
+                fetch(url)
+  .then(response => response.text())
+  .then(text => {
+    console.log('Raw response:', text); // Log the raw text
+    // Try parsing manually in a try/catch if it's not empty
+    try {
+      const data = JSON.parse(text);
+      // Process your data here
+    } catch (error) {
+      console.error('Failed to parse JSON:', error, 'Raw text:', text);
+    }
+  })
+  .catch(error => {
+    console.error('Fetch error:', error);
+  });
+
                 if (!res.ok) throw new Error(data.error);
                 sessionStorage.setItem('token', data.token);
                 sessionStorage.setItem('username', data.username);
