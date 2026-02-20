@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apartments</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar same as dashboard -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark"> ... (copy from dashboard) </nav>
+
+    <div class="container mt-4">
+        <h2>Apartment Management</h2>
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#aptModal" onclick="resetModal()">Add Apartment</button>
+        <table class="table table-striped" id="aptTable">
+            <thead><tr><th>ID</th><th>Number</th><th>Floor</th><th>Block</th><th>Area (sqft)</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="aptModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Apartment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <form id="aptForm">
+                        <input type="hidden" id="aptId">
+                        <div class="mb-3"><label>Number</label><input id="aptNumber" class="form-control" required></div>
+                        <div class="mb-3"><label>Floor</label><input id="aptFloor" type="number" class="form-control" required></div>
+                        <div class="mb-3"><label>Block</label><input id="aptBlock" class="form-control" required></div>
+                        <div class="mb-3"><label>Area (sqft)</label><input id="aptArea" type="number" class="form-control" required></div>
+                        <div class="mb-3"><label>Status</label>
+                            <select id="aptStatus" class="form-select"><option value="occupied">Occupied</option><option value="vacant">Vacant</option></select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveApartment()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // checkAuth(), logout() copy from dashboard
+        function getData(k) { return JSON.parse(localStorage.getItem(k)) || []; }
+        function saveData(k, d) { localStorage.setItem(k, JSON.stringify(d)); }
+
+        function renderTable() {
+            const data = getData('apartments');
+            let html = '';
+            data.forEach(a => {
+                html += `<tr>
+                    <td>${a.id}</td><td>${a.number}</td><td>${a.floor}</td><td>${a.block}</td><td>${a.area}</td><td>${a.status}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editApartment(${a.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApartment(${a.id})">Delete</button>
+                    </td>
+                </tr>`;
+            });
+            document.querySelector('#aptTable tbody').innerHTML = html;
+        }
+
+        let editId = null;
+        function resetModal() { editId = null; document.getElementById('aptForm').reset(); }
+        function editApartment(id) {
+            const data = getData('apartments');
+            const apt = data.find(a => a.id === id);
+            if (!apt) return;
+            editId = id;
+            document.getElementById('aptId').value = apt.id;
+            document.getElementById('aptNumber').value = apt.number;
+            // fill other fields...
+            new bootstrap.Modal(document.getElementById('aptModal')).show();
+        }
+        function saveApartment() {
+            const data = getData('apartments');
+            const newApt = {
+                id: editId || Date.now(),
+                number: document.getElementById('aptNumber').value,
+                floor: parseInt(document.getElementById('aptFloor').value),
+                block: document.getElementById('aptBlock').value,
+                area: parseInt(document.getElementById('aptArea').value),
+                status: document.getElementById('aptStatus').value
+            };
+            if (editId) {
+                const idx = data.findIndex(a => a.id === editId);
+                data[idx] = newApt;
+            } else data.push(newApt);
+            saveData('apartments', data);
+            renderTable();
+            bootstrap.Modal.getInstance(document.getElementById('aptModal')).hide();
+        }
+        function deleteApartment(id) {
+            if (!confirm('Delete?')) return;
+            let data = getData('apartments');
+            data = data.filter(a => a.id !== id);
+            saveData('apartments', data);
+            renderTable();
+        }
+
+        window.onload = () => {
+            checkAuth(); // paste function
+            renderTable();
+        };
+    </script>
+</body>
+</html>
