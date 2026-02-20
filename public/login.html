@@ -35,7 +35,7 @@
                 });
                 const data = await res.json()                
 
-                //if (!res.ok) throw new Error(data.error);
+                if (!res.ok) throw new Error(data.error);
                 sessionStorage.setItem('token', data.token);
                 sessionStorage.setItem('username', data.username);
                 sessionStorage.setItem('role', data.role);
