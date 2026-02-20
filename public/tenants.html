@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenants - Apartment Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar (same as above) -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="dashboard.html">Apartment Mgmt</a>
+            <div class="navbar-nav ms-auto">
+                <span id="userInfo" class="nav-link text-light"></span>
+                <a href="#" onclick="logout()" class="nav-link text-light">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>Tenant Management</h2>
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#tenantModal" onclick="resetModal()">Add Tenant</button>
+        <table class="table table-striped" id="tenantTable">
+            <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Email</th><th>Apartment</th><th>Rent</th><th>Move-in</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="modal fade" id="tenantModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Tenant</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <form id="tenantForm">
+                        <input type="hidden" id="tenantId">
+                        <div class="mb-3"><label>Name</label><input id="tenantName" class="form-control" required></div>
+                        <div class="mb-3"><label>Phone</label><input id="tenantPhone" class="form-control" required></div>
+                        <div class="mb-3"><label>Email</label><input id="tenantEmail" type="email" class="form-control" required></div>
+                        <div class="mb-3"><label>Apartment</label><select id="tenantApartment" class="form-select" required></select></div>
+                        <div class="mb-3"><label>Rent (₹)</label><input id="tenantRent" type="number" class="form-control" required></div>
+                        <div class="mb-3"><label>Move-in Date</label><input id="tenantMoveIn" type="date" class="form-control" required></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTenant()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const token = sessionStorage.getItem('token');
+        if (!token) window.location.href = 'login.html';
+        document.getElementById('userInfo').textContent = `${sessionStorage.getItem('username')} (${sessionStorage.getItem('role')})`;
+
+        function logout() { sessionStorage.clear(); window.location.href = 'login.html'; }
+
+        async function apiRequest(method, endpoint, body = null) {
+            const res = await fetch(endpoint, {
+                method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: body ? JSON.stringify(body) : null
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Error');
+            return res.json();
+        }
+
+        async function populateApartmentSelect() {
+            const apts = await apiRequest('GET', '/api/apartments');
+            const select = document.getElementById('tenantApartment');
+            select.innerHTML = '<option value="">Select Apartment</option>';
+            apts.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id; opt.textContent = `${a.number} (${a.block})`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function renderTable() {
+            const data = await apiRequest('GET', '/api/tenants');
+            let html = '';
+            data.forEach(t => {
+                html += `<tr><td>${t.id}</td><td>${t.name}</td><td>${t.phone}</td><td>${t.email}</td><td>${t.apartment_id || 'N/A'}</td>
+                    <td>₹${t.rent_amount}</td><td>${t.move_in_date}</td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editTenant(${t.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteTenant(${t.id})">Delete</button></td></tr>`;
+            });
+            document.querySelector('#tenantTable tbody').innerHTML = html || '<tr><td colspan="8" class="text-center">No tenants</td></tr>';
+        }
+
+        let editId = null;
+        async function resetModal() {
+            editId = null;
+            document.getElementById('tenantForm').reset();
+            await populateApartmentSelect();
+        }
+        async function editTenant(id) {
+            const data = await apiRequest('GET', '/api/tenants');
+            const tenant = data.find(t => t.id === id);
+            editId = id;
+            await populateApartmentSelect();
+            document.getElementById('tenantId').value = tenant.id;
+            document.getElementById('tenantName').value = tenant.name;
+            document.getElementById('tenantPhone').value = tenant.phone;
+            document.getElementById('tenantEmail').value = tenant.email;
+            document.getElementById('tenantApartment').value = tenant.apartment_id || '';
+            document.getElementById('tenantRent').value = tenant.rent_amount;
+            document.getElementById('tenantMoveIn').value = tenant.move_in_date;
+            new bootstrap.Modal(document.getElementById('tenantModal')).show();
+        }
+        async function saveTenant() {
+            const payload = {
+                name: document.getElementById('tenantName').value,
+                phone: document.getElementById('tenantPhone').value,
+                email: document.getElementById('tenantEmail').value,
+                apartment_id: parseInt(document.getElementById('tenantApartment').value) || null,
+                rent_amount: parseFloat(document.getElementById('tenantRent').value),
+                move_in_date: document.getElementById('tenantMoveIn').value
+            };
+            if (editId) await apiRequest('PUT', `/api/tenants/${editId}`, payload);
+            else await apiRequest('POST', '/api/tenants', payload);
+            renderTable();
+            bootstrap.Modal.getInstance(document.getElementById('tenantModal')).hide();
+        }
+        async function deleteTenant(id) {
+            if (!confirm('Delete?')) return;
+            await apiRequest('DELETE', `/api/tenants/${id}`);
+            renderTable();
+        }
+
+        window.onload = async () => { await renderTable(); };
+    </script>
+</body>
+</html>

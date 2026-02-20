@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apartments - Apartment Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="dashboard.html">Apartment Mgmt</a>
+            <div class="navbar-nav ms-auto">
+                <span id="userInfo" class="nav-link text-light"></span>
+                <a href="#" onclick="logout()" class="nav-link text-light">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>Apartment Management</h2>
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#aptModal" onclick="resetModal()">Add Apartment</button>
+        <table class="table table-striped" id="aptTable">
+            <thead><tr><th>ID</th><th>Number</th><th>Floor</th><th>Block</th><th>Area (sqft)</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="modal fade" id="aptModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Apartment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <form id="aptForm">
+                        <input type="hidden" id="aptId">
+                        <div class="mb-3"><label>Number</label><input id="aptNumber" class="form-control" required></div>
+                        <div class="mb-3"><label>Floor</label><input id="aptFloor" type="number" class="form-control" required></div>
+                        <div class="mb-3"><label>Block</label><input id="aptBlock" class="form-control" required></div>
+                        <div class="mb-3"><label>Area (sqft)</label><input id="aptArea" type="number" class="form-control" required></div>
+                        <div class="mb-3"><label>Status</label>
+                            <select id="aptStatus" class="form-select"><option value="occupied">Occupied</option><option value="vacant">Vacant</option></select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveApartment()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const token = sessionStorage.getItem('token');
+        if (!token) window.location.href = 'login.html';
+        document.getElementById('userInfo').textContent = `${sessionStorage.getItem('username')} (${sessionStorage.getItem('role')})`;
+
+        function logout() { sessionStorage.clear(); window.location.href = 'login.html'; }
+
+        async function apiRequest(method, endpoint, body = null) {
+            const res = await fetch(endpoint, {
+                method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: body ? JSON.stringify(body) : null
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Error');
+            return res.json();
+        }
+
+        async function renderTable() {
+            const data = await apiRequest('GET', '/api/apartments');
+            let html = '';
+            data.forEach(a => {
+                html += `<tr>
+                    <td>${a.id}</td><td>${a.number}</td><td>${a.floor}</td><td>${a.block}</td><td>${a.area}</td><td>${a.status}</td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editApartment(${a.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApartment(${a.id})">Delete</button></td>
+                </tr>`;
+            });
+            document.querySelector('#aptTable tbody').innerHTML = html || '<tr><td colspan="7" class="text-center">No apartments</td></tr>';
+        }
+
+        let editId = null;
+        function resetModal() { editId = null; document.getElementById('aptForm').reset(); }
+        async function editApartment(id) {
+            const apt = (await apiRequest('GET', `/api/apartments`)).find(a => a.id === id);
+            editId = id;
+            document.getElementById('aptId').value = apt.id;
+            document.getElementById('aptNumber').value = apt.number;
+            document.getElementById('aptFloor').value = apt.floor;
+            document.getElementById('aptBlock').value = apt.block;
+            document.getElementById('aptArea').value = apt.area;
+            document.getElementById('aptStatus').value = apt.status;
+            new bootstrap.Modal(document.getElementById('aptModal')).show();
+        }
+        async function saveApartment() {
+            const payload = {
+                number: document.getElementById('aptNumber').value,
+                floor: parseInt(document.getElementById('aptFloor').value),
+                block: document.getElementById('aptBlock').value,
+                area: parseFloat(document.getElementById('aptArea').value),
+                status: document.getElementById('aptStatus').value
+            };
+            if (editId) await apiRequest('PUT', `/api/apartments/${editId}`, payload);
+            else await apiRequest('POST', '/api/apartments', payload);
+            renderTable();
+            bootstrap.Modal.getInstance(document.getElementById('aptModal')).hide();
+        }
+        async function deleteApartment(id) {
+            if (!confirm('Delete?')) return;
+            await apiRequest('DELETE', `/api/apartments/${id}`);
+            renderTable();
+        }
+
+        window.onload = renderTable;
+    </script>
+</body>
+</html>
